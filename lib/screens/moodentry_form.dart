@@ -1,10 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:mental_health_tracker/widgets/left_drawer.dart'; // Import the previously created drawer
+import 'package:mental_health_tracker/widgets/left_drawer.dart';
+import 'package:pbp_django_auth/pbp_django_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:mental_health_tracker/screens/menu.dart';
 
 class MoodEntryFormPage extends StatefulWidget {
-  final bool showBackButton;
-
-  const MoodEntryFormPage({super.key, this.showBackButton = false});
+  const MoodEntryFormPage({super.key});
 
   @override
   State<MoodEntryFormPage> createState() => _MoodEntryFormPageState();
@@ -18,6 +21,7 @@ class _MoodEntryFormPageState extends State<MoodEntryFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    final request = context.watch<CookieRequest>();
     return Scaffold(
       appBar: AppBar(
         title: const Center(
@@ -27,16 +31,8 @@ class _MoodEntryFormPageState extends State<MoodEntryFormPage> {
         ),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
-        leading: widget.showBackButton
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              )
-            : null,
       ),
-      drawer: widget.showBackButton ? null : const LeftDrawer(), // Conditionally add the drawer
+      drawer: const LeftDrawer(),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -116,56 +112,58 @@ class _MoodEntryFormPageState extends State<MoodEntryFormPage> {
                 ),
               ),
               Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: ElevatedButton(
-                    style: ButtonStyle(
-                      backgroundColor: MaterialStateProperty.all(
-                          Theme.of(context).colorScheme.primary),
-                    ),
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        showDialog(
-                          context: context,
-                          builder: (context) {
-                            return AlertDialog(
-                              title: const Text('Mood successfully saved'),
-                              content: SingleChildScrollView(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Mood: $_mood'),
-                                    Text('Feelings: $_feelings'),
-                                    Text('Mood Intensity: $_moodIntensity'),
-                                  ],
-                                ),
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ElevatedButton(
+                      style: ButtonStyle(
+    backgroundColor: MaterialStateProperty.all(
+        Theme.of(context).colorScheme.primary),
+          ),
+          onPressed: () async {
+    if (_formKey.currentState!.validate()) {
+        // Send request to Django and wait for the response
+        // TODO: Change the URL to your Django app's URL. Don't forget to add the trailing slash (/) if needed.
+        final response = await request.postJson(
+            "http://127.0.0.1:8000/create-flutter/",
+            jsonEncode(<String, String>{
+                'mood': _mood,
+                'mood_intensity': _moodIntensity.toString(),
+                'feelings': _feelings,
+            // TODO: Adjust the fields with your project
+            }),
+        );
+        if (context.mounted) {
+            if (response['status'] == 'success') {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(
+                content: Text("New mood has saved successfully!"),
+                ));
+                Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => MyHomePage()),
+                );
+            } else {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(
+                    content:
+                        Text("Something went wrong, please try again."),
+                ));
+            }
+        }
+    }
+},
+          child: const Text(
+            "Save",
+            style: TextStyle(color: Colors.white),
                               ),
-                              actions: [
-                                TextButton(
-                                  child: const Text('OK'),
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    _formKey.currentState!.reset();
-                                  },
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      }
-                    },
-                    child: const Text(
-                      "Save",
-                      style: TextStyle(color: Colors.white),
-                    ),
+                            ),
+                          ),
+                        ),              
+                    ],
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
